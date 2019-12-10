@@ -138,77 +138,114 @@ storiesOf('Measurement tests', module)
   ));
 
 storiesOf('ArcMotion', module)
-  .add('Test1', () => (
-    <ArcMotionTest x={0} y={0} />
-  ));
+  .add('Arc: ⤷', () => (
+    <ArcMotionTest from={{ x: 0, y: 0 }} to={{ x: 350, y: 350 }} />
+  ))
+  .add('Arc: ↖︎', () => (
+    <ArcMotionTest from={{ x: 350, y: 350 }} to={{ x: 0, y: 0 }} />
+  ))
+  .add('Arc: ⤶', () => (
+    <ArcMotionTest from={{ x: 350, y: 0 }} to={{ x: 0, y: 350 }} />
+  ))
+  .add('Arc: ⤴︎', () => (
+    <ArcMotionTest from={{ x: 0, y: 350 }} to={{ x: 350, y: 0 }} />
+  ))
+  .add('Arc: ⤷ deltaX < deltaY', () => (
+    <ArcMotionTest from={{ x: 0, y: 0 }} to={{ x: 350, y: 600 }} />
+  ))
+  .add('Arc: ↖︎ deltaX < deltaY', () => (
+    <ArcMotionTest from={{ x: 350, y: 600 }} to={{ x: 0, y: 0 }} />
+  ))
+  .add('Arc: ⤶ deltaX < deltaY', () => (
+    <ArcMotionTest from={{ x: 350, y: 0 }} to={{ x: 0, y: 600 }} />
+  ))
+  .add('Arc: ⤴︎ deltaX < deltaY', () => (
+    <ArcMotionTest from={{ x: 0, y: 600 }} to={{ x: 350, y: 0 }} />
+  ))
+  .add('Arc: ⤷ deltaX > deltaY', () => (
+    <ArcMotionTest from={{ x: 0, y: 0 }} to={{ x: 350, y: 150 }} />
+  ))
+  .add('Arc: ↖︎ deltaX > deltaY', () => (
+    <ArcMotionTest from={{ x: 350, y: 150 }} to={{ x: 0, y: 0 }} />
+  ))
+  .add('Arc: ⤶ deltaX > deltaY', () => (
+    <ArcMotionTest from={{ x: 350, y: 0 }} to={{ x: 0, y: 150 }} />
+  ))
+  .add('Arc: ⤴︎ deltaX > deltaY', () => (
+    <ArcMotionTest from={{ x: 0, y: 150 }} to={{ x: 350, y: 0 }} />
+  ))
+  .add('straighline, up -> down', () => (
+    <ArcMotionTest from={{ x: 150, y: 0 }} to={{ x: 150, y: 600 }} />
+  ))
+  .add('straighline, left -> right', () => (
+    <ArcMotionTest from={{ x: 0, y: 200 }} to={{ x: 300, y: 200 }} />
+  ))
+  ;
 
-storiesOf('Animated tests', module)
-  .add('Nested Animated.View', () => (
-    <NestedAnimatedTest />
-  ));
+// The same idea as AnimatedValue.interpolate()
+const interpolate = (inputRange, outputRange) => (v) => {
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+  const [inputMin, inputMax] = inputRange;
+  const effectiveV = clamp(v, inputMin, inputMax);
+  const [outputMin, outputMax] = outputRange;
+  return outputMin + (effectiveV - inputMin) * (outputMax - outputMin) / (inputMax - inputMin);
+};
 
-class NestedAnimatedTest extends React.Component {
-  constructor(props) {
-    super(props);
-    this.progress = new Animated.Value(0);
+function getArcEasingY(from, to) {
+  let p1 = { x: 0, y: 0.5 };
+  let p2 = { x: 0.5, y: 1 };
+  if ((from.x > to.x && from.y > to.y) || (from.x < to.x && from.y > to.y)) {
+    const swapXy = ({ x, y }) => ({ x: y, y: x });
+    p1 = swapXy(p1);
+    p2 = swapXy(p2);
   }
-  componentDidMount() {
-    Animated.timing(this.progress, {
-      toValue: 1,
-      duration: 2000,
-    }).start()
-  }
-  render() {
-    const inputRange = [0, 1];
-    const left = this.progress.interpolate({
-      inputRange,
-      outputRange: [100, 200],
-    });
-    const top = this.progress.interpolate({
-      inputRange,
-      outputRange: [100, 200],
-    });
-    const common = {
-      position: 'absolute',
-      right: null,
-      bottom: null,
-    };
-    const square = { width: 50, height: 50, backgroundColor: 'red' };
-    const animated = { left, top };
-    return (
-      <Animated.View style={[common, animated]}>
-        <Text>Inside Animated</Text>
-        <Animated.View style={[common, square, animated]} />
-      </Animated.View>
-    )
-  }
+  return Easing.bezier(p1.x, p1.y, p2.x, p2.y);
 }
 
 class ArcMotionTest extends React.Component {
   constructor(props) {
     super(props);
     this.progress = new Animated.Value(0);
+    this.state = {
+      points: [],
+      animating: false,
+    }
   }
+  shouldComponentUpdate(nextProps, nextState) {
+    return !nextState.animating;
+  }
+
   componentDidMount() {
+    this.setState({ animating: true });
     Animated.timing(this.progress, {
-      duration: 3000,
+      duration: 1000,
       toValue: 1,
-    }).start();
+      easing: Easing.linear,
+      // easing: Easing.bezier(0.4, 0, 0.2, 1),
+    }).start(() => this.setState({ animating: false }));
   }
-  animateTo({ x, y }) {
+  getAnimatedStyle() {
     const inputRange = [0, 1];
-    const { props } = this;
-    const left = this.progress.interpolate({
+    const { props: { from, to } } = this;
+
+    const translateX = this.progress.interpolate({
       inputRange,
-      outputRange: [props.x, x],
-      easing: Easing.bezier(0.5, 0, 0.5, 0),
+      outputRange: [from.x, to.x],
     });
-    const top = this.progress.interpolate({
+    const translateY = this.progress.interpolate({
       inputRange,
-      outputRange: [props.y, y],
-      // easing: Easing.bezier(0, 0.5, 0, 0.5),
+      outputRange: [from.y, to.y],
     });
-    return { left, top };
+
+    this.progress.addListener(() => {
+      const x = translateX.__getAnimatedValue();
+      const y = translateY.__getAnimatedValue();
+      this.setState(prevState => ({
+        points: [...prevState.points, { x, y }],
+        animating: true,
+      }))
+    })
+    return { transform: [{ translateX }, { translateY }] };
   }
   render() {
     const style = {
@@ -219,11 +256,34 @@ class ArcMotionTest extends React.Component {
       height: 50,
       right: null,
       bottom: null,
-      backgroundColor: 'red',
+      backgroundColor: '#FF0000AA',
     };
-    const animatedStyle = this.animateTo({ x: 150, y: 300 });
+    const animatedStyle = this.getAnimatedStyle();
     return (
-      <Animated.View style={[style, animatedStyle]} />
+      <View>
+        <Path points={this.state.points} />
+        <Animated.View style={[style, animatedStyle]} />
+      </View>
     );
   }
+}
+
+const Path = ({ points }) => (
+  <View>
+    {points.map((p, idx) => {
+      const opacity = idx / (points.length - 1) + 0.1;
+      const backgroundColor = 'blue';
+      return (
+        <View key={idx}
+          style={{ ...pointStyle, opacity, backgroundColor, transform: [{ translateX: p.x }, { translateY: p.y }] }} />
+      );
+    })}
+  </View>
+);
+
+const pointStyle = {
+  width: 5,
+  height: 5,
+  borderRadius: 5,
+  position: 'absolute',
 }
